@@ -12,6 +12,14 @@ let particles = [];
 let prevPixels = null;
 const MAX_PARTICLES = 3000;
 
+// Cyberpunk Mode Variables
+let faceApi;
+let detections = [];
+let prevPixelSum = 0;
+let glitchActive = false;
+let glitchTimer = 0;
+let cyberCanvas;
+
 function setup() {
     canvas = createCanvas(windowWidth, windowHeight, WEBGL);
     canvas.parent('canvas-container');
@@ -116,6 +124,9 @@ function draw() {
             break;
         case "SAND":
             renderFallingSand(vw, vh);
+            break;
+        case "CYBER":
+            renderCyberpunk(vw, vh);
             break;
         default:
             renderFiberOptic(vw, vh);
@@ -293,6 +304,248 @@ function renderFallingSand(vw, vh) {
         sphere(p.size);
         pop();
     }
+}
+
+// ==========================================
+// MODE 4: CYBERPUNK HUD
+// Neon color grading, chromatic aberration, face HUD
+// ==========================================
+function initCyberpunk() {
+    console.log('Initializing Cyberpunk Mode...');
+    cyberCanvas = createGraphics(windowWidth, windowHeight);
+    cyberCanvas.textFont('monospace');
+
+    // Initialize face detection with error handling
+    try {
+        if (typeof ml5 !== 'undefined' && ml5.faceApi) {
+            faceApi = ml5.faceApi(video, { withLandmarks: true, withDescriptors: false }, () => {
+                console.log('Face API Ready');
+                faceApi.detect(gotFaces);
+            });
+        } else {
+            console.warn('ml5.js faceApi not available');
+        }
+    } catch (e) {
+        console.error('Face API init error:', e);
+    }
+}
+
+function gotFaces(error, result) {
+    if (error) {
+        console.error('Face detection error:', error);
+        return;
+    }
+    detections = result || [];
+    if (faceApi) {
+        setTimeout(() => faceApi.detect(gotFaces), 100); // Throttle
+    }
+}
+
+function renderCyberpunk(vw, vh) {
+    try {
+        if (!cyberCanvas) initCyberpunk();
+
+        cyberCanvas.clear();
+
+        // Motion detection for glitch trigger
+        let pixelSum = 0;
+        for (let i = 0; i < video.pixels.length; i += 40) {
+            pixelSum += video.pixels[i];
+        }
+        let motionDelta = abs(pixelSum - prevPixelSum);
+        prevPixelSum = pixelSum;
+
+        // Trigger glitch on rapid motion
+        if (motionDelta > 50000) {
+            glitchActive = true;
+            glitchTimer = 30; // frames
+        }
+
+        if (glitchTimer > 0) {
+            glitchTimer--;
+        } else {
+            glitchActive = false;
+        }
+
+        // === RENDER TO 2D CANVAS ===
+
+        // 1. Color Grading + Chromatic Aberration
+        let scale = min(windowWidth / vw, windowHeight / vh);
+        let offsetX = (windowWidth - vw * scale) / 2;
+        let offsetY = (windowHeight - vh * scale) / 2;
+
+        cyberCanvas.noStroke();
+
+        for (let y = 0; y < vh; y += 2) {
+            for (let x = 0; x < vw; x += 2) {
+                let idx = (y * vw + (vw - 1 - x)) * 4;
+                let r = video.pixels[idx];
+                let g = video.pixels[idx + 1];
+                let b = video.pixels[idx + 2];
+                let bright = (r + g + b) / 3;
+
+                // Color grading: dark = navy, bright = cyan/magenta
+                let mappedR, mappedG, mappedB;
+                if (bright < 80) {
+                    // Dark: Deep Navy
+                    mappedR = map(bright, 0, 80, 10, 30);
+                    mappedG = map(bright, 0, 80, 10, 20);
+                    mappedB = map(bright, 0, 80, 40, 80);
+                } else {
+                    // Bright: Neon Cyan/Magenta blend
+                    let blend = (x + y + frameCount * 2) % 100 / 100;
+                    if (blend > 0.5) {
+                        // Cyan
+                        mappedR = map(bright, 80, 255, 0, 50);
+                        mappedG = map(bright, 80, 255, 200, 255);
+                        mappedB = map(bright, 80, 255, 200, 255);
+                    } else {
+                        // Magenta
+                        mappedR = map(bright, 80, 255, 200, 255);
+                        mappedG = map(bright, 80, 255, 0, 100);
+                        mappedB = map(bright, 80, 255, 200, 255);
+                    }
+                }
+
+                let px = offsetX + x * scale;
+                let py = offsetY + y * scale;
+                let sz = scale * 2;
+
+                // Chromatic Aberration: offset RGB channels
+                let aberration = glitchActive ? random(3, 8) : 2;
+
+                cyberCanvas.fill(mappedR, 0, 0, 100);
+                cyberCanvas.rect(px - aberration, py, sz, sz);
+
+                cyberCanvas.fill(0, mappedG, 0, 100);
+                cyberCanvas.rect(px, py, sz, sz);
+
+                cyberCanvas.fill(0, 0, mappedB, 100);
+                cyberCanvas.rect(px + aberration, py, sz, sz);
+            }
+        }
+
+        // 2. Glitch Effect: Slit-scan + SIGNAL LOST
+        if (glitchActive) {
+            // Slit-scan lines
+            cyberCanvas.stroke(255, 0, 100, 150);
+            cyberCanvas.strokeWeight(2);
+            for (let i = 0; i < 10; i++) {
+                let yPos = random(windowHeight);
+                cyberCanvas.line(0, yPos, windowWidth, yPos);
+            }
+
+            // SIGNAL LOST text
+            cyberCanvas.noStroke();
+            cyberCanvas.fill(255, 0, 80);
+            cyberCanvas.textSize(48);
+            cyberCanvas.textAlign(CENTER, CENTER);
+            if (frameCount % 10 < 5) {
+                cyberCanvas.text('[ SIGNAL LOST ]', windowWidth / 2, windowHeight / 2);
+            }
+        }
+
+        // 3. Face HUD Overlay
+        if (detections.length > 0) {
+            for (let det of detections) {
+                let box = det.alignedRect._box;
+                let fx = offsetX + (vw - box._x - box._width) * scale; // Mirror X
+                let fy = offsetY + box._y * scale;
+                let fw = box._width * scale;
+                let fh = box._height * scale;
+
+                // HUD Frame
+                cyberCanvas.noFill();
+                cyberCanvas.stroke(0, 255, 200, 200);
+                cyberCanvas.strokeWeight(2);
+                cyberCanvas.rect(fx, fy, fw, fh);
+
+                // Corner brackets
+                let corner = 20;
+                cyberCanvas.line(fx, fy, fx + corner, fy);
+                cyberCanvas.line(fx, fy, fx, fy + corner);
+                cyberCanvas.line(fx + fw, fy, fx + fw - corner, fy);
+                cyberCanvas.line(fx + fw, fy, fx + fw, fy + corner);
+                cyberCanvas.line(fx, fy + fh, fx + corner, fy + fh);
+                cyberCanvas.line(fx, fy + fh, fx, fy + fh - corner);
+                cyberCanvas.line(fx + fw, fy + fh, fx + fw - corner, fy + fh);
+                cyberCanvas.line(fx + fw, fy + fh, fx + fw, fy + fh - corner);
+
+                // Status text
+                cyberCanvas.fill(0, 255, 200);
+                cyberCanvas.noStroke();
+                cyberCanvas.textSize(12);
+                cyberCanvas.textAlign(LEFT, TOP);
+                cyberCanvas.text('ID: UNKNOWN', fx, fy - 20);
+                cyberCanvas.text('STATUS: SCANNING...', fx, fy + fh + 5);
+
+                // 4. Cybernetic Eye Crosshairs
+                if (det.parts && det.parts.leftEye) {
+                    let leftEye = det.parts.leftEye[0];
+                    let rightEye = det.parts.rightEye[0];
+
+                    let eyeScale = scale;
+
+                    // Left Eye
+                    let lex = offsetX + (vw - leftEye._x) * eyeScale;
+                    let ley = offsetY + leftEye._y * eyeScale;
+                    drawCyberneticEye(cyberCanvas, lex, ley);
+
+                    // Right Eye
+                    let rex = offsetX + (vw - rightEye._x) * eyeScale;
+                    let rey = offsetY + rightEye._y * eyeScale;
+                    drawCyberneticEye(cyberCanvas, rex, rey);
+                }
+            }
+        }
+
+        // Scanlines overlay
+        cyberCanvas.stroke(0, 255, 200, 20);
+        cyberCanvas.strokeWeight(1);
+        for (let i = 0; i < windowHeight; i += 4) {
+            cyberCanvas.line(0, i, windowWidth, i);
+        }
+
+        // === DRAW TO MAIN WEBGL CANVAS ===
+        push();
+        resetMatrix();
+        translate(-width / 2, -height / 2, 0);
+        noLights();
+        image(cyberCanvas, 0, 0);
+        pop();
+
+        perspective();
+    } catch (e) {
+        console.error('Cyberpunk render error:', e);
+    }
+}
+
+function drawCyberneticEye(pg, x, y) {
+    let r = 25;
+
+    // Outer glow circle
+    pg.noFill();
+    pg.stroke(0, 255, 200, 150);
+    pg.strokeWeight(2);
+    pg.circle(x, y, r * 2);
+
+    // Inner crosshairs
+    pg.stroke(255, 0, 100);
+    pg.strokeWeight(1);
+    pg.line(x - r, y, x + r, y);
+    pg.line(x, y - r, x, y + r);
+
+    // Center dot
+    pg.fill(255, 0, 100);
+    pg.noStroke();
+    pg.circle(x, y, 6);
+
+    // Rotating element
+    let angle = frameCount * 0.05;
+    let rx = x + cos(angle) * r * 0.7;
+    let ry = y + sin(angle) * r * 0.7;
+    pg.fill(0, 255, 200);
+    pg.circle(rx, ry, 4);
 }
 
 function windowResized() {
