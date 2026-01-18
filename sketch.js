@@ -27,6 +27,27 @@ function setup() {
     dlBtn.addEventListener('click', () => {
         saveCanvas('illusion_snapshot', 'png');
     });
+
+    // Guide Modal Interactions
+    const guideBtn = document.getElementById('guideButton');
+    const guideModal = document.getElementById('guideModal');
+    const closeBtn = document.querySelector('.close-modal');
+
+    if (guideBtn && guideModal) {
+        guideBtn.addEventListener('click', () => {
+            guideModal.classList.add('visible');
+        });
+
+        closeBtn.addEventListener('click', () => {
+            guideModal.classList.remove('visible');
+        });
+
+        window.addEventListener('click', (e) => {
+            if (e.target === guideModal) {
+                guideModal.classList.remove('visible');
+            }
+        });
+    }
 }
 
 function initCamera() {
@@ -48,6 +69,8 @@ function initCamera() {
         document.getElementById('startButton').innerText = "LINK ESTABLISHED";
         setTimeout(() => {
             document.getElementById('overlay').classList.add('hidden');
+            // Show UI Logic - Ensure it's visible
+            document.getElementById('ui-controls').style.display = 'flex';
         }, 500);
     });
 
@@ -58,7 +81,8 @@ function initCamera() {
 function draw() {
     background(0); // Black void
 
-    if (!isInitialized || !video || !video.loadedmetadata) {
+    // Bugfix: loadedmetadata doesn't exist on p5 object. Use width check.
+    if (!isInitialized || !video || video.width === 0) {
         return;
     }
 

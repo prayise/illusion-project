@@ -18,6 +18,8 @@
 
 <body>
 
+    <div id="app-logo">PRISM <span>v1.0</span></div>
+
     <div id="ui-controls" class="panel">
         <div class="panel-header">MOTION CONTROL</div>
         <div class="control-group">
@@ -30,6 +32,7 @@
         </div>
         <div class="panel-footer">
             <button id="downloadButton">📸 SNAPSHOT</button>
+            <button id="guideButton" class="secondary-btn">ℹ️ SYSTEM GUIDE</button>
         </div>
     </div>
     <div id="overlay">
@@ -42,6 +45,31 @@
                 Video data is processed locally within your browser.<br>
                 No data is transmitted to external servers.
             </p>
+        </div>
+    </div>
+
+    <!-- Guide Modal -->
+    <div id="guideModal">
+        <div class="guide-content">
+            <div class="close-modal">&times;</div>
+            <h2>PRISM USER GUIDE</h2>
+
+            <div class="guide-section">
+                <h3>// SYSTEM OVERVIEW</h3>
+                <p>PRISM transforms your digital reflection into a high-fidelity fiber optic projection.</p>
+            </div>
+
+            <div class="guide-section">
+                <h3>// MOTION CONTROLS</h3>
+                <p><strong>ROTATE:</strong> Orbit around the 3D projection.</p>
+                <p><strong>TILT:</strong> Adjust vertical camera angle.</p>
+            </div>
+
+            <div class="guide-section">
+                <h3>// PRIVACY PROTOCOL</h3>
+                <p>All video processing is performed locally on your device (Client-Side). No video data is transmitted
+                    to any external server.</p>
+            </div>
         </div>
     </div>
 
