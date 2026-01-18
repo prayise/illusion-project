@@ -22,6 +22,11 @@ function setup() {
         startBtn.innerText = "CONNECTING...";
         initCamera();
     });
+
+    const dlBtn = document.getElementById('downloadButton');
+    dlBtn.addEventListener('click', () => {
+        saveCanvas('illusion_snapshot', 'png');
+    });
 }
 
 function initCamera() {
