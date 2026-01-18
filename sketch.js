@@ -1,5 +1,5 @@
 let video;
-let pixelSize = 8; // Smaller for 3D effect (User requested 1/10th, but 2-3px might kill FPS on JS. Starting meaningful small size)
+let pixelSize = 10;
 let canvas;
 let isInitialized = false;
 
@@ -12,7 +12,7 @@ function setup() {
     canvas = createCanvas(windowWidth, windowHeight, WEBGL);
     canvas.parent('canvas-container');
 
-    // Default camera position
+    // Default camera position - Tilted for "Floor" view
     camZ = (height / 2.0) / tan(PI * 30.0 / 180.0);
     targetCamZ = camZ;
 
@@ -46,132 +46,112 @@ function initCamera() {
         }, 500);
     });
 
-    video.size(100, 75); // Increased resolution (was 64x48)
+    video.size(160, 120); // 160x120 = 19,200 fibers
     video.hide();
 }
 
 function draw() {
-    background(0); // Deep black background
+    background(0); // Black void
 
     if (!isInitialized || !video || !video.loadedmetadata) {
         return;
     }
 
-    // 1. Camera Smoothing (Lerp)
-    // Map mouse to camera rotation/position for "Look Around" effect
+    // 1. Camera Smoothing & Angle
     let mX = (mouseX - width / 2);
     let mY = (mouseY - height / 2);
 
-    targetCamX = mX * 0.8; // Increased range
-    targetCamY = mY * 0.8;
+    // User wants "See face in 3D" -> We need more side profile capability
+    // Map mouseX to rotation (Azimuth), mouseY to elevation (Altitude)
+    targetCamX = mX * 1.5; // Wider rotation range to see side profile
+    targetCamY = mY * 1.5; // Wider tilt range
 
-    // Smooth interpolation (lerp)
     camX = lerp(camX, targetCamX, 0.05);
     camY = lerp(camY, targetCamY, 0.05);
 
-    // Apply Camera
-    camera(camX, camY, camZ + 300, // Zoom out slightly for bigger grid
-        0, 0, 0,       // Center
-        0, 1, 0);      // Up
+    // Camera Position: Rotate around center
+    // Orbit Control logic simulation
+    // We look at (0,0,0) from (camX, camY, distance)
 
-    // 2. Lighting
-    // Ambient light for base visibility of black pillars
-    ambientLight(30);
-    // Directional light from "screen"
-    directionalLight(255, 255, 255, 0, 0, -1);
-    // Point light following mouse?
-    pointLight(255, 0, 0, camX, camY, 200);
+    camera(camX, camY - 100, camZ + 200,
+        0, 0, 0, // Look at Center of "Face" (not floor)
+        0, 1, 0);
+
+    // 2. Lighting - Enhanced for Visibility
+    ambientLight(40); // Brighter base
+    // Key Light
+    pointLight(0, 0, 100, camX, camY, 300); // White light from viewer
+    // Fill Light (Warm)
+    directionalLight(50, 0, 100, 1, 0, -0.5);
 
     // 3. 3D Pillar Loading
     video.loadPixels();
 
-    // We render a grid of boxes centered at (0,0)
-    // Vidoe source is small (64x48)
-    // We want to cover a large area.
-
     let vw = video.width;
     let vh = video.height;
 
-    // Pixel to World Scale
-    // How big is each 'pixel' in the 3D world?
-    let boxSize = 10; // Smaller boxes
-    let spacing = 10; // Tighter spacing
+    // FIBER OPTIC SETTINGS
+    // High Density but Thin Strands
+    let spacing = 5;
+    let fiberWidth = 1.8; // Thin strands relative to spacing
 
     let totalW = vw * spacing;
     let totalH = vh * spacing;
 
-    // Center alignment offset
     let startX = -totalW / 2;
     let startY = -totalH / 2;
 
+    // No Stroke for clean fiber look
     noStroke();
-    // Or stroke for wireframe look? User asked: "black color pillar also pixel unit shine"
-    // Maybe specualr material does this.
-
-    // Glitch Offset Logic
-    // In 3D World Units
-    let maxOffsetWorld = 50;
-    let currentOffset = map(mouseX, 0, width, -maxOffsetWorld, maxOffsetWorld);
 
     for (let y = 0; y < vh; y++) {
         for (let x = 0; x < vw; x++) {
 
-            // Mirroring
             let mirroredX = vw - 1 - x;
-
             let idx = (y * vw + mirroredX) * 4;
 
             let r = video.pixels[idx];
             let g = video.pixels[idx + 1];
             let b = video.pixels[idx + 2];
-
             let bright = (r + g + b) / 3;
 
-            // Base Position for this grid cell
-            let baseX = startX + x * spacing;
-            let baseY = startY + y * spacing;
+            // Optimization
+            if (bright < 20) continue;
+
+            // FIBER OPTIC LOOK
+            // 1. Dark, semi-transparent shaft
+            // 2. Bright glowing tip
+
+            let zNorm = bright / 255.0;
+            let zHeight = map(zNorm, 0, 1, 10, 200);
+
+            let px = startX + x * spacing;
+            let py = startY + y * spacing;
 
             push();
-            translate(baseX, baseY, 0);
+            translate(px, py, 0);
 
-            // 1. Black Pillar Base (Dark Matter)
-            // Always draw this as the foundation
-            if (bright < 40) {
-                specularMaterial(20);
-                shininess(50);
-                fill(10, 10, 10);
-                translate(0, 0, 10);
-                box(boxSize, boxSize, 20);
-            } else {
-                // 2. RGB Separation
-                // Instead of one box, we draw 3 if offset is non-zero
-                // To prevent Z-fighting when offset is 0, we can slightly offset Z or mix.
+            // Draw Shaft (The Fiber Body)
+            // Dark gray, reflective but not emitting light
+            specularMaterial(30);
+            shininess(50); // Glossy plastic
+            // fill(20); // Dark body
 
-                // Height calculation
-                let zH = map(bright, 0, 255, 10, 300);
+            // Allow slight color tint on shaft but keep it dark?
+            // "Optical fiber" sides are usually just cladding.
+            fill(r * 0.1, g * 0.1, b * 0.1);
 
-                // RED Pillar (Left/Right Shift by offset)
-                push();
-                translate(-currentOffset, 0, zH / 2);
-                emissiveMaterial(r, 0, 0); // Pure Red component of the pixel
-                // We use the pixel's 'r' value for intensity
-                box(boxSize, boxSize, zH);
-                pop();
+            translate(0, 0, zHeight / 2);
+            box(fiberWidth, fiberWidth, zHeight);
 
-                // GREEN Pillar (Center)
-                push();
-                translate(0, 0, zH / 2);
-                emissiveMaterial(0, g, 0);
-                box(boxSize, boxSize, zH);
-                pop();
+            // Draw Tip (The Light Source)
+            // Emissive bright cap
+            translate(0, 0, zHeight / 2 + 0.5); // Accound for half-height + tiny gap
 
-                // BLUE Pillar (Opposite Shift)
-                push();
-                translate(currentOffset, 0, zH / 2);
-                emissiveMaterial(0, 0, b);
-                box(boxSize, boxSize, zH);
-                pop();
-            }
+            emissiveMaterial(r, g, b); // Full brightness color
+            // Small cap
+            box(fiberWidth, fiberWidth, 2);
+
             pop();
         }
     }
