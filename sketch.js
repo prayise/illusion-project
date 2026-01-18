@@ -20,6 +20,15 @@ let glitchActive = false;
 let glitchTimer = 0;
 let cyberCanvas;
 
+// Matrix Modes Variables
+let matrixCanvas;
+let matrixStreams = [];
+let matrixInitialized = false;
+let timeFrozen = false;
+let shockwaves = [];
+let ghostTrails = []; // For System Failure mode artifacts
+let userCenterX = 0, userCenterY = 0; // For The One repulsion
+
 function setup() {
     canvas = createCanvas(windowWidth, windowHeight, WEBGL);
     canvas.parent('canvas-container');
@@ -127,6 +136,15 @@ function draw() {
             break;
         case "CYBER":
             renderCyberpunk(vw, vh);
+            break;
+        case "CODE":
+            renderMatrixCode(vw, vh);
+            break;
+        case "ONE":
+            renderMatrixOne(vw, vh);
+            break;
+        case "FAILURE":
+            renderMatrixFailure(vw, vh);
             break;
         default:
             renderFiberOptic(vw, vh);
@@ -548,6 +566,478 @@ function drawCyberneticEye(pg, x, y) {
     pg.circle(rx, ry, 4);
 }
 
+// ==========================================
+// MATRIX VISUAL MODES (The Code, The One, System Failure)
+// ==========================================
+
+const SYMBOL_SIZE = 14;
+const KATAKANA_START = 0x30A0;
+
+class MatrixChar {
+    constructor(x, y, speed) {
+        this.x = x;
+        this.y = y;
+        this.speed = speed;
+        this.value = this.randomChar();
+        this.switchInterval = floor(random(5, 20));
+    }
+
+    randomChar() {
+        if (random() > 0.4) {
+            return String.fromCharCode(KATAKANA_START + floor(random(96)));
+        }
+        return random() > 0.5 ?
+            String.fromCharCode(0x30 + floor(random(10))) :
+            String.fromCharCode(0x41 + floor(random(26)));
+    }
+
+    update() {
+        if (frameCount % this.switchInterval === 0) {
+            this.value = this.randomChar();
+        }
+    }
+}
+
+class MatrixStreamObj {
+    constructor(x, mode) {
+        this.x = x;
+        this.y = random(-500, 0);
+        this.speed = random(3, 8);
+        this.chars = [];
+        this.length = floor(random(10, 30));
+        this.mode = mode;
+        this.direction = 1; // 1 = down, -1 = up
+        this.horizontal = false;
+
+        for (let i = 0; i < this.length; i++) {
+            this.chars.push(new MatrixChar(x, this.y - i * SYMBOL_SIZE, this.speed));
+        }
+    }
+
+    update() {
+        if (!timeFrozen) {
+            if (this.horizontal) {
+                this.x += this.speed * this.direction;
+                if (this.x > width + 100 || this.x < -100) {
+                    this.x = this.direction > 0 ? -50 : width + 50;
+                }
+            } else {
+                this.y += this.speed * this.direction;
+                if (this.y - this.length * SYMBOL_SIZE > height || this.y < -500) {
+                    this.y = this.direction > 0 ? random(-200, 0) : height + 200;
+                }
+            }
+        }
+
+        for (let i = 0; i < this.chars.length; i++) {
+            let c = this.chars[i];
+            if (this.horizontal) {
+                c.x = this.x - i * SYMBOL_SIZE * this.direction;
+                c.y = this.y;
+            } else {
+                c.y = this.y - i * SYMBOL_SIZE * this.direction;
+            }
+            c.update();
+        }
+    }
+}
+
+function initMatrixMode() {
+    matrixCanvas = createGraphics(windowWidth, windowHeight);
+    matrixCanvas.textFont('monospace');
+    matrixCanvas.textSize(SYMBOL_SIZE);
+    matrixCanvas.textAlign(LEFT, TOP);
+
+    matrixStreams = [];
+    let cols = ceil(width / SYMBOL_SIZE);
+    for (let i = 0; i < cols; i++) {
+        matrixStreams.push(new MatrixStreamObj(i * SYMBOL_SIZE, 'CODE'));
+    }
+    matrixInitialized = true;
+}
+
+// MODE A: THE CODE (Classic) - Text-only, Density Mapping, Hyper-Activity
+function renderMatrixCode(vw, vh) {
+    if (!matrixInitialized) initMatrixMode();
+
+    matrixCanvas.clear();
+    matrixCanvas.background(0, 25);
+
+    let scaleX = vw / width;
+    let scaleY = vh / height;
+
+    // First pass: Render background streams (slow, sparse)
+    for (let stream of matrixStreams) {
+        stream.update();
+
+        for (let i = 0; i < stream.chars.length; i++) {
+            let c = stream.chars[i];
+            if (c.y < 0 || c.y > height) continue;
+
+            // Check if this position overlaps with user
+            let vidX = floor(constrain(vw - c.x * scaleX, 0, vw - 1));
+            let vidY = floor(constrain(c.y * scaleY, 0, vh - 1));
+            let idx = (vidY * vw + vidX) * 4;
+            let bright = (video.pixels[idx] + video.pixels[idx + 1] + video.pixels[idx + 2]) / 3;
+
+            let isUser = bright > 50;
+            let isHead = (i === 0);
+
+            if (isUser) {
+                // USER AREA: Dense text, bright colors, hyper-activity
+                // Hyper-activity: change character every few frames
+                if (frameCount % 3 === 0) {
+                    c.value = c.randomChar();
+                }
+
+                // Density based on brightness
+                let density = map(bright, 50, 255, 0.5, 1.0);
+                if (random() > density) continue;
+
+                // Bright user colors: light green to white
+                let userAlpha = map(bright, 50, 255, 150, 255);
+                if (bright > 180) {
+                    // Very bright = white highlight
+                    matrixCanvas.fill(255, 255, 255, userAlpha);
+                } else {
+                    // Normal bright = light green (#50FF50)
+                    matrixCanvas.fill(80, 255, 80, userAlpha);
+                }
+                matrixCanvas.text(c.value, c.x, c.y);
+            } else {
+                // BACKGROUND: Sparse, dim, standard green
+                if (random() > 0.4) continue; // Very sparse
+
+                let alpha = isHead ? 180 : map(i, 0, stream.length, 120, 20);
+                matrixCanvas.fill(0, 255, 65, alpha);
+                matrixCanvas.text(c.value, c.x, c.y);
+            }
+        }
+    }
+
+    // Draw to WEBGL
+    push();
+    resetMatrix();
+    translate(-width / 2, -height / 2, 0);
+    noLights();
+    image(matrixCanvas, 0, 0);
+    pop();
+    perspective();
+}
+
+// MODE B: THE ONE (Awakening) - Golden Glow, Repulsion, Solid Light Form
+function renderMatrixOne(vw, vh) {
+    if (!matrixInitialized) initMatrixMode();
+
+    matrixCanvas.clear();
+    matrixCanvas.background(0, 40);
+
+    let scaleX = vw / width;
+    let scaleY = vh / height;
+
+    // Calculate user center for repulsion
+    let sumX = 0, sumY = 0, count = 0;
+    for (let y = 0; y < vh; y += 4) {
+        for (let x = 0; x < vw; x += 4) {
+            let idx = (y * vw + (vw - 1 - x)) * 4;
+            let bright = (video.pixels[idx] + video.pixels[idx + 1] + video.pixels[idx + 2]) / 3;
+            if (bright > 60) {
+                sumX += x * (width / vw);
+                sumY += y * (height / vh);
+                count++;
+            }
+        }
+    }
+    if (count > 0) {
+        userCenterX = lerp(userCenterX, sumX / count, 0.1);
+        userCenterY = lerp(userCenterY, sumY / count, 0.1);
+    }
+
+    // Update shockwaves
+    for (let i = shockwaves.length - 1; i >= 0; i--) {
+        shockwaves[i].radius += 8;
+        shockwaves[i].alpha -= 4;
+        if (shockwaves[i].alpha <= 0) shockwaves.splice(i, 1);
+    }
+
+    // Background rain with repulsion effect
+    for (let stream of matrixStreams) {
+        stream.update();
+
+        for (let i = 0; i < stream.chars.length; i++) {
+            let c = stream.chars[i];
+            if (c.y < 0 || c.y > height) continue;
+
+            // Repulsion: push code away from user center
+            let dx = c.x - userCenterX;
+            let dy = c.y - userCenterY;
+            let distToUser = sqrt(dx * dx + dy * dy);
+            let repulsionRadius = 250;
+
+            let renderX = c.x;
+            let renderY = c.y;
+
+            if (distToUser < repulsionRadius) {
+                // Physical push: shift render position away from center
+                let force = map(distToUser, 0, repulsionRadius, 1.2, 0);
+                renderX += dx * force * 0.6;
+                renderY += dy * force * 0.6;
+
+                // Code near user is blurred and very dim
+                let alpha = map(distToUser, 0, repulsionRadius, 2, 25);
+                matrixCanvas.fill(0, 60, 30, alpha);
+            } else {
+                // Normal dim background
+                let alpha = map(i, 0, stream.length, 40, 10);
+                matrixCanvas.fill(0, 80, 40, alpha);
+            }
+            matrixCanvas.text(c.value, renderX, renderY);
+        }
+    }
+
+    // User: Solid golden/white glow with ADD-like blending
+    matrixCanvas.blendMode(ADD);
+
+    for (let y = 0; y < vh; y += 2) {
+        for (let x = 0; x < vw; x += 2) {
+            let idx = (y * vw + (vw - 1 - x)) * 4;
+            let bright = (video.pixels[idx] + video.pixels[idx + 1] + video.pixels[idx + 2]) / 3;
+
+            if (bright > 40) {
+                let px = x * (width / vw);
+                let py = y * (height / vh);
+
+                // Solid glow: golden core with white highlight
+                let coreSize = map(bright, 40, 255, 3, 10);
+                let intensity = map(bright, 40, 255, 50, 200);
+
+                // Golden aura
+                matrixCanvas.noStroke();
+                matrixCanvas.fill(255, 200, 100, intensity * 0.5);
+                matrixCanvas.circle(px, py, coreSize * 2);
+
+                // White core
+                matrixCanvas.fill(255, 255, 230, intensity);
+                matrixCanvas.circle(px, py, coreSize);
+
+                // Generate shockwave on strong motion
+                if (prevPixels && random() > 0.995) {
+                    let prevBright = (prevPixels[idx] + prevPixels[idx + 1] + prevPixels[idx + 2]) / 3;
+                    if (abs(bright - prevBright) > 40) {
+                        shockwaves.push({ x: px, y: py, radius: 20, alpha: 200 });
+                    }
+                }
+            }
+        }
+    }
+
+    matrixCanvas.blendMode(BLEND);
+
+    // Draw expanding shockwaves
+    matrixCanvas.noFill();
+    for (let sw of shockwaves) {
+        // Golden shockwave
+        matrixCanvas.stroke(255, 220, 150, sw.alpha);
+        matrixCanvas.strokeWeight(3);
+        matrixCanvas.circle(sw.x, sw.y, sw.radius * 2);
+
+        // Secondary ring
+        matrixCanvas.stroke(255, 255, 200, sw.alpha * 0.5);
+        matrixCanvas.strokeWeight(1);
+        matrixCanvas.circle(sw.x, sw.y, sw.radius * 2.5);
+    }
+
+    // Draw to WEBGL
+    push();
+    resetMatrix();
+    translate(-width / 2, -height / 2, 0);
+    noLights();
+    image(matrixCanvas, 0, 0);
+    pop();
+    perspective();
+}
+
+// MODE C: SYSTEM FAILURE (Glitch) - Slice/Shift, Broken Unicode, Ghost Trails
+function renderMatrixFailure(vw, vh) {
+    if (!matrixInitialized) initMatrixMode();
+
+    // Intermittent blink effect
+    if (random() > 0.98) {
+        matrixCanvas.background(0);
+        push();
+        resetMatrix();
+        translate(-width / 2, -height / 2, 0);
+        noLights();
+        image(matrixCanvas, 0, 0);
+        pop();
+        perspective();
+        return; // Screen blink - skip frame
+    }
+
+    matrixCanvas.clear();
+    matrixCanvas.background(20, 0, 0, 30); // Red tinted background
+
+    let scaleX = vw / width;
+    let scaleY = vh / height;
+
+    // Chaos: randomize stream directions more frequently
+    if (frameCount % 30 === 0) {
+        for (let stream of matrixStreams) {
+            if (random() > 0.6) {
+                stream.direction = random() > 0.5 ? 1 : -1;
+                stream.horizontal = random() > 0.5;
+                stream.y = random(-100, height);
+            }
+        }
+    }
+
+    // Broken unicode characters
+    const brokenChars = ['■', '□', '▓', '▒', '░', '█', '▄', '▀', '◼', '◻', '▪', '▫', '⬛', '⬜', '◾', '◽'];
+
+    // Render chaotic streams with broken characters
+    for (let stream of matrixStreams) {
+        stream.update();
+
+        for (let i = 0; i < stream.chars.length; i++) {
+            let c = stream.chars[i];
+            if (c.y < 0 || c.y > height || c.x < 0 || c.x > width) continue;
+
+            let isHead = (i === 0);
+            let alpha = isHead ? 255 : map(i, 0, stream.length, 200, 40);
+
+            // Mostly red, some green and purple
+            let colorChoice = random();
+            if (colorChoice < 0.6) matrixCanvas.fill(255, 0, 50, alpha);
+            else if (colorChoice < 0.8) matrixCanvas.fill(0, 200, 50, alpha);
+            else matrixCanvas.fill(180, 0, 255, alpha);
+
+            // Sometimes use broken characters
+            let charToRender = (random() > 0.85) ? brokenChars[floor(random(brokenChars.length))] : c.value;
+            matrixCanvas.text(charToRender, c.x, c.y);
+        }
+    }
+
+    // Update ghost trails (persistent artifacts)
+    for (let i = ghostTrails.length - 1; i >= 0; i--) {
+        ghostTrails[i].alpha -= 2;
+        ghostTrails[i].y += random(-1, 2); // Slight drift
+        if (ghostTrails[i].alpha <= 0) ghostTrails.splice(i, 1);
+    }
+
+    // Limit ghost trails
+    while (ghostTrails.length > 500) {
+        ghostTrails.shift();
+    }
+
+    // Draw ghost trails (red artifacts)
+    for (let gt of ghostTrails) {
+        matrixCanvas.noStroke();
+        matrixCanvas.fill(255, 0, 50, gt.alpha);
+        matrixCanvas.rect(gt.x, gt.y, 4, 4);
+    }
+
+    // User with SLICE/SHIFT glitch, Broken Unicode, and strong chromatic aberration
+    let sliceOffset = floor(random(-30, 30)); // Horizontal slice shift
+    let sliceY = floor(random(height * 0.2, height * 0.8)); // Where slice occurs
+    let sliceHeight = floor(random(30, 100));
+
+    for (let y = 0; y < vh; y += 3) {
+        for (let x = 0; x < vw; x += 3) {
+            let idx = (y * vw + (vw - 1 - x)) * 4;
+            let bright = (video.pixels[idx] + video.pixels[idx + 1] + video.pixels[idx + 2]) / 3;
+
+            if (bright > 30) {
+                let px = x * (width / vw);
+                let py = y * (height / vh);
+
+                // SLICE/SHIFT
+                if (py > sliceY && py < sliceY + sliceHeight) {
+                    px += sliceOffset;
+                }
+
+                // Strong RGB chromatic aberration offset
+                let offset = map(bright, 30, 255, 6, 18);
+
+                // Data Corruption: use special characters for user
+                let userChar = (random() > 0.4) ? brokenChars[floor(random(brokenChars.length))] : '?';
+
+                matrixCanvas.textSize(12);
+                matrixCanvas.noStroke();
+
+                // Red channel
+                matrixCanvas.fill(255, 0, 0, 120);
+                matrixCanvas.text(userChar, px - offset, py);
+
+                // Cyan channel
+                matrixCanvas.fill(0, 255, 255, 100);
+                matrixCanvas.text(userChar, px + offset, py);
+
+                // Add ghost trail on motion
+                if (prevPixels && random() > 0.96) {
+                    let prevBright = (prevPixels[idx] + prevPixels[idx + 1] + prevPixels[idx + 2]) / 3;
+                    if (abs(bright - prevBright) > 15) {
+                        ghostTrails.push({ x: px, y: py, alpha: 180 });
+                    }
+                }
+            }
+        }
+    }
+    matrixCanvas.textSize(SYMBOL_SIZE);
+
+    // Periodic noise/distortion lines
+    if (random() > 0.9) {
+        matrixCanvas.stroke(255, 0, 80, 200);
+        matrixCanvas.strokeWeight(random(2, 5));
+        for (let i = 0; i < floor(random(3, 10)); i++) {
+            let yPos = random(height);
+            let xStart = random(width * 0.3);
+            let xEnd = xStart + random(width * 0.3, width * 0.7);
+            matrixCanvas.line(xStart, yPos, xEnd, yPos);
+        }
+    }
+
+    // Occasional "SYSTEM ERROR" text
+    if (random() > 0.97 && frameCount % 5 < 3) {
+        matrixCanvas.fill(255, 0, 50);
+        matrixCanvas.textSize(32);
+        matrixCanvas.textAlign(CENTER, CENTER);
+        let errorMsgs = ['SYSTEM ERROR', 'DATA CORRUPTION', 'SIGNAL LOST', 'VIRUS DETECTED', 'MEMORY FAULT'];
+        matrixCanvas.text(errorMsgs[floor(random(errorMsgs.length))], width / 2 + random(-50, 50), height / 2 + random(-100, 100));
+        matrixCanvas.textSize(SYMBOL_SIZE);
+        matrixCanvas.textAlign(LEFT, TOP);
+    }
+
+    // Draw to WEBGL
+    push();
+    resetMatrix();
+    translate(-width / 2, -height / 2, 0);
+    noLights();
+    image(matrixCanvas, 0, 0);
+    pop();
+    perspective();
+}
+
+// Keyboard controls for mode switching
+function keyPressed() {
+    if (key === '1') {
+        document.getElementById('modeSelector').value = 'CODE';
+    } else if (key === '2') {
+        document.getElementById('modeSelector').value = 'ONE';
+    } else if (key === '3') {
+        document.getElementById('modeSelector').value = 'FAILURE';
+    }
+}
+
+// Time Freeze: mouse hold
+function mousePressed() {
+    timeFrozen = true;
+}
+
+function mouseReleased() {
+    timeFrozen = false;
+}
+
 function windowResized() {
     resizeCanvas(windowWidth, windowHeight);
 }
+
