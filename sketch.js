@@ -62,24 +62,22 @@ function draw() {
         return;
     }
 
-    // 1. Camera Smoothing & Angle
-    let mX = (mouseX - width / 2);
-    let mY = (mouseY - height / 2);
+    // 1. Camera Control (Sliders)
+    // Removed Mouse dependency
+    const rotVal = document.getElementById('rotSlider').value;
+    const tiltVal = document.getElementById('tiltSlider').value;
 
-    // User wants "See face in 3D" -> We need more side profile capability
-    // Map mouseX to rotation (Azimuth), mouseY to elevation (Altitude)
-    targetCamX = mX * 1.5; // Wider rotation range to see side profile
-    targetCamY = mY * 1.5; // Wider tilt range
+    // Map slider values directly to camera target positions
+    targetCamX = parseFloat(rotVal);
+    targetCamY = parseFloat(tiltVal);
 
-    camX = lerp(camX, targetCamX, 0.05);
-    camY = lerp(camY, targetCamY, 0.05);
+    // Smooth interpolation
+    camX = lerp(camX, targetCamX, 0.1);
+    camY = lerp(camY, targetCamY, 0.1);
 
-    // Camera Position: Rotate around center
-    // Orbit Control logic simulation
-    // We look at (0,0,0) from (camX, camY, distance)
-
-    camera(camX, camY - 100, camZ + 200,
-        0, 0, 0, // Look at Center of "Face" (not floor)
+    // Camera Position
+    camera(camX, camY - 100, camZ + 300,
+        0, 0, 0,
         0, 1, 0);
 
     // 2. Lighting - Enhanced for Visibility

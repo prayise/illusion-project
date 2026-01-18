@@ -18,8 +18,19 @@
 
 <body>
 
-    <div id="ui-controls">
-        <button id="downloadButton">📸 SNAPSHOT</button>
+    <div id="ui-controls" class="panel">
+        <div class="panel-header">MOTION CONTROL</div>
+        <div class="control-group">
+            <label>ROTATE</label>
+            <input type="range" id="rotSlider" min="-1000" max="1000" value="0">
+        </div>
+        <div class="control-group">
+            <label>TILT</label>
+            <input type="range" id="tiltSlider" min="-500" max="500" value="0">
+        </div>
+        <div class="panel-footer">
+            <button id="downloadButton">📸 SNAPSHOT</button>
+        </div>
     </div>
     <div id="overlay">
         <div class="content">
