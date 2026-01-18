@@ -228,6 +228,24 @@ body {
     letter-spacing: 1px;
 }
 
+/* Mode Selector Dropdown */
+#modeSelector {
+    width: 100%;
+    padding: 8px 10px;
+    background: rgba(0, 0, 0, 0.8);
+    border: 1px solid var(--accent-color);
+    color: var(--accent-color);
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    cursor: pointer;
+    outline: none;
+}
+
+#modeSelector option {
+    background: #111;
+    color: var(--accent-color);
+}
+
 input[type=range] {
     -webkit-appearance: none;
     appearance: none;
