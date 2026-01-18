@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cyber-Pixel Glitch Mirror</title>
+    <!-- Use Google Fonts for a tech/cyberpunk look -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="style.css">
+    
+    <!-- p5.js library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+</head>
+<body>
+
+    <div id="overlay">
+        <div class="content">
+            <h1>SYSTEM IDENTIFIED</h1>
+            <p>ACCESSING OPTICAL SENSORS...</p>
+            <button id="startButton">INITIALIZE LINK</button>
+            <p class="privacy-notice">
+                [PRIVACY PROTOCOL: ACTIVE]<br>
+                Video data is processed locally within your browser.<br>
+                No data is transmitted to external servers.
+            </p>
+        </div>
+    </div>
+
+    <!-- p5.js canvas will be injected here automatically, but we can containerize it if needed -->
+    <main id="canvas-container"></main>
+
+    <script src="sketch.js"></script>
+</body>
+</html>

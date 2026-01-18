@@ -1,0 +1,98 @@
+:root {
+    --bg-color: #000000;
+    --text-color: #e0e0e0;
+    --accent-color: #00ff41; /* Cyberpunk Green */
+    --glitch-red: #ff0055;
+    --glitch-blue: #00ccff;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    font-family: 'Roboto Mono', monospace;
+    overflow: hidden; /* Prevent scrollbars from canvas */
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#canvas-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+}
+
+/* Overlay Styles */
+#overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.95);
+    z-index: 10;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    transition: opacity 0.5s ease, visibility 0.5s;
+}
+
+#overlay.hidden {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.content h1 {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+    color: var(--glitch-blue);
+    text-shadow: 2px 2px var(--glitch-red);
+    letter-spacing: 2px;
+}
+
+.content p {
+    font-size: 1rem;
+    margin-bottom: 2rem;
+    color: var(--text-color);
+}
+
+#startButton {
+    background: transparent;
+    border: 2px solid var(--accent-color);
+    color: var(--accent-color);
+    padding: 15px 30px;
+    font-family: 'Roboto Mono', monospace;
+    font-size: 1.2rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+#startButton:hover {
+    background: var(--accent-color);
+    color: var(--bg-color);
+    box-shadow: 0 0 15px var(--accent-color);
+}
+
+.privacy-notice {
+    margin-top: 3rem;
+    font-size: 0.7rem !important;
+    opacity: 0.6;
+    line-height: 1.4;
+    border-top: 1px dashed #333;
+    padding-top: 1rem;
+}
